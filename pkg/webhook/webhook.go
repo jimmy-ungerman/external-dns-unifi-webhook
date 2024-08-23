@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/kashalls/external-dns-provider-unifi/cmd/webhook/init/log"
-
+	"github.com/kashalls/external-dns-provider-unifi/cmd/webhook/init/metrics"
 	"sigs.k8s.io/external-dns/endpoint"
 	"sigs.k8s.io/external-dns/plan"
 	"sigs.k8s.io/external-dns/provider"
@@ -24,6 +25,7 @@ const (
 // Webhook for external dns provider
 type Webhook struct {
 	provider provider.Provider
+	metrics  metrics.Metrics
 }
 
 // New creates a new instance of the Webhook
@@ -92,6 +94,7 @@ func (p *Webhook) headerCheck(isContentType bool, w http.ResponseWriter, r *http
 
 // Records handles the get request for records
 func (p *Webhook) Records(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	if err := p.acceptHeaderCheck(w, r); err != nil {
 		requestLog(r).With(zap.Error(err)).Error("accept header check failed")
 		return
@@ -115,10 +118,15 @@ func (p *Webhook) Records(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	p.metrics.RecordsCreated.Set(float64(len(records)))
+	p.metrics.TotalRequests.Inc()
+	duration := time.Since(start).Seconds()
+	p.metrics.ResponseTimeHistogram.Observe(duration)
 }
 
 // ApplyChanges handles the post request for record changes
 func (p *Webhook) ApplyChanges(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	if err := p.contentTypeHeaderCheck(w, r); err != nil {
 		requestLog(r).With(zap.Error(err)).Error("content type header check failed")
 		return
@@ -150,10 +158,15 @@ func (p *Webhook) ApplyChanges(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+	p.metrics.TotalRequests.Inc()
+	duration := time.Since(start).Seconds()
+	p.metrics.ResponseTimeHistogram.Observe(duration)
+
 }
 
 // AdjustEndpoints handles the post request for adjusting endpoints
 func (p *Webhook) AdjustEndpoints(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	if err := p.contentTypeHeaderCheck(w, r); err != nil {
 		log.Error("content-type header check failed", zap.String("req_method", r.Method), zap.String("req_path", r.URL.Path))
 		return
@@ -192,9 +205,14 @@ func (p *Webhook) AdjustEndpoints(w http.ResponseWriter, r *http.Request) {
 	if _, writeError := fmt.Fprint(w, string(out)); writeError != nil {
 		requestLog(r).With(zap.Error(writeError)).Fatal("error writing response")
 	}
+	p.metrics.TotalRequests.Inc()
+	duration := time.Since(start).Seconds()
+	p.metrics.ResponseTimeHistogram.Observe(duration)
+
 }
 
 func (p *Webhook) Negotiate(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	if err := p.acceptHeaderCheck(w, r); err != nil {
 		requestLog(r).With(zap.Error(err)).Error("accept header check failed")
 		return
@@ -213,6 +231,10 @@ func (p *Webhook) Negotiate(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	p.metrics.TotalRequests.Inc()
+	duration := time.Since(start).Seconds()
+	p.metrics.ResponseTimeHistogram.Observe(duration)
+
 }
 
 func requestLog(r *http.Request) *zap.Logger {

@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kashalls/external-dns-provider-unifi/cmd/webhook/init/metrics"
-
 	"sigs.k8s.io/external-dns/endpoint"
 	"sigs.k8s.io/external-dns/plan"
 	"sigs.k8s.io/external-dns/provider"
@@ -57,8 +55,6 @@ func (p *Provider) Records(ctx context.Context) ([]*endpoint.Endpoint, error) {
 
 		endpoints = append(endpoints, ep)
 	}
-	metrics.RecordCountGauge.Set(float64(len(endpoints)))
-
 	return endpoints, nil
 }
 
