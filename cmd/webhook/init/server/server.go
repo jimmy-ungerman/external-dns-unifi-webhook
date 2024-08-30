@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/kashalls/external-dns-provider-unifi/cmd/webhook/init/configuration"
 	"github.com/kashalls/external-dns-provider-unifi/cmd/webhook/init/log"
+	"github.com/kashalls/external-dns-provider-unifi/cmd/webhook/init/metrics"
 	"github.com/kashalls/external-dns-provider-unifi/pkg/webhook"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -32,7 +33,7 @@ func ReadinessHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Init initializes the http server
-func Init(config configuration.Config, p *webhook.Webhook) (*http.Server, *http.Server) {
+func Init(config configuration.Config, p *webhook.Webhook, m *metrics.Metrics) (*http.Server, *http.Server) {
 	mainRouter := chi.NewRouter()
 	mainRouter.Get("/", p.Negotiate)
 	mainRouter.Get("/records", p.Records)
@@ -48,7 +49,7 @@ func Init(config configuration.Config, p *webhook.Webhook) (*http.Server, *http.
 	}()
 
 	healthRouter := chi.NewRouter()
-	healthRouter.Get("/metrics", promhttp.Handler().ServeHTTP)
+	healthRouter.Get("/metrics", promhttp.HandlerFor(m.Registry, promhttp.HandlerOpts{}).ServeHTTP)
 	healthRouter.Get("/healthz", HealthCheckHandler)
 	healthRouter.Get("/readyz", ReadinessHandler)
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/kashalls/external-dns-provider-unifi/cmd/webhook/init/log"
+	"github.com/kashalls/external-dns-provider-unifi/cmd/webhook/init/metrics"
 
 	"sigs.k8s.io/external-dns/endpoint"
 	"sigs.k8s.io/external-dns/plan"
@@ -24,11 +25,12 @@ const (
 // Webhook for external dns provider
 type Webhook struct {
 	provider provider.Provider
+	metrics  *metrics.Metrics
 }
 
 // New creates a new instance of the Webhook
-func New(provider provider.Provider) *Webhook {
-	p := Webhook{provider: provider}
+func New(provider provider.Provider, metrics *metrics.Metrics) *Webhook {
+	p := Webhook{provider: provider, metrics: metrics}
 	return &p
 }
 
@@ -115,6 +117,7 @@ func (p *Webhook) Records(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	p.metrics.Records.Set(float64(len(records)))
 }
 
 // ApplyChanges handles the post request for record changes

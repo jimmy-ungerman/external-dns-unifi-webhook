@@ -6,6 +6,7 @@ import (
 	"github.com/kashalls/external-dns-provider-unifi/cmd/webhook/init/configuration"
 	"github.com/kashalls/external-dns-provider-unifi/cmd/webhook/init/dnsprovider"
 	"github.com/kashalls/external-dns-provider-unifi/cmd/webhook/init/log"
+	"github.com/kashalls/external-dns-provider-unifi/cmd/webhook/init/metrics"
 	"github.com/kashalls/external-dns-provider-unifi/cmd/webhook/init/server"
 	"github.com/kashalls/external-dns-provider-unifi/pkg/webhook"
 
@@ -34,6 +35,8 @@ func main() {
 		log.Error("failed to initialize provider", zap.Error(err))
 	}
 
-	main, health := server.Init(config, webhook.New(provider))
+	appMetrics := metrics.NewMetrics()
+
+	main, health := server.Init(config, webhook.New(provider, appMetrics), appMetrics)
 	server.ShutdownGracefully(main, health)
 }
