@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/kashalls/external-dns-provider-unifi/cmd/webhook/init/log"
 	"github.com/kashalls/external-dns-provider-unifi/cmd/webhook/init/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"sigs.k8s.io/external-dns/endpoint"
 	"sigs.k8s.io/external-dns/plan"
@@ -94,8 +96,11 @@ func (p *Webhook) headerCheck(isContentType bool, w http.ResponseWriter, r *http
 
 // Records handles the get request for records
 func (p *Webhook) Records(w http.ResponseWriter, r *http.Request) {
+	now := time.Now()
+
 	if err := p.acceptHeaderCheck(w, r); err != nil {
 		requestLog(r).With(zap.Error(err)).Error("accept header check failed")
+		p.metrics.Duration.With(prometheus.Labels{"method": "GET", "route": "/records", "status": "406"}).Observe(float64(time.Since(now)))
 		return
 	}
 
@@ -105,6 +110,7 @@ func (p *Webhook) Records(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		requestLog(r).With(zap.Error(err)).Error("error getting records")
 		w.WriteHeader(http.StatusInternalServerError)
+		p.metrics.Duration.With(prometheus.Labels{"method": "GET", "route": "/records", "status": "500"}).Observe(float64(time.Since(now)))
 		return
 	}
 
@@ -115,8 +121,10 @@ func (p *Webhook) Records(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		requestLog(r).With(zap.Error(err)).Error("error encoding records")
 		w.WriteHeader(http.StatusInternalServerError)
+		p.metrics.Duration.With(prometheus.Labels{"method": "GET", "route": "/records", "status": "500"}).Observe(float64(time.Since(now)))
 		return
 	}
+	p.metrics.Duration.With(prometheus.Labels{"method": "GET", "route": "/records", "status": "200"}).Observe(float64(time.Since(now)))
 	p.metrics.Records.Set(float64(len(records)))
 }
 
